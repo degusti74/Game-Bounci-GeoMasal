@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BounceQuiz AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f7ff;
+            color: #1e3a8a;
+            margin: 0;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #e0f2fe; }
+        ::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border-radius: 12px;
+            box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        .btn-option {
+            transition: all 0.2s;
+        }
+        .btn-option:hover {
+            transform: translateY(-2px);
+        }
+        .btn-option:active {
+            transform: translateY(0);
+        }
+
+        .timer-circle {
+            transition: stroke-dashoffset 1s linear;
+        }
+
+        /* Game Over Screen */
+        #gameOverScreen {
+            display: none;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-md z-10 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-extrabold tracking-tight">BounceQuiz AI</h1>
+            <p class="text-blue-200 text-sm font-semibold">Sosiologi - Gejala Sosial Dalam Masyarakat Multikultural</p>
+        </div>
+        <div class="flex items-center gap-4">
+            <select id="classSelector" class="bg-blue-700 border border-blue-500 text-white text-sm rounded-lg focus:ring-blue-300 focus:border-blue-300 block p-2.5 outline-none font-semibold cursor-pointer">
+                <option value="X.1">X.1</option>
+                <option value="X.2">X.2</option>
+            </select>
+        </div>
+    </header>
+
+    <!-- Info Bar (Progress & Score) -->
+    <div class="bg-white border-b border-blue-200 p-3 px-6 flex justify-between items-center shadow-sm z-10 font-semibold text-blue-800">
+        <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path></svg>
+            <span id="progressText">Terjawab: 0 / Total: 38</span>
+        </div>
+        <div class="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+            <span id="scoreText">Skor Benar: 0</span>
+        </div>
+    </div>
+
+    <!-- Main Game Area -->
+    <main class="flex-grow relative p-4 flex flex-col">
+        <div id="gameContainer" class="flex-grow w-full relative">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="absolute inset-0 bg-white z-20 flex flex-col items-center justify-center p-6 text-center">
+            <h2 class="text-4xl font-extrabold text-blue-600 mb-2">BounceQuiz Selesai!</h2>
+            <p class="text-gray-500 mb-8 font-medium">Anda telah menyelesaikan seluruh soal.</p>
+            
+            <div class="grid grid-cols-2 gap-4 w-full max-w-md mb-8">
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <p class="text-sm text-blue-600 font-semibold">Total Soal</p>
+                    <p class="text-2xl font-bold text-blue-900">38</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded-xl border border-green-100">
+                    <p class="text-sm text-green-600 font-semibold">Jawaban Benar</p>
+                    <p id="finalCorrect" class="text-2xl font-bold text-green-900">0</p>
+                </div>
+                <div class="bg-red-50 p-4 rounded-xl border border-red-100">
+                    <p class="text-sm text-red-600 font-semibold">Jawaban Salah</p>
+                    <p id="finalWrong" class="text-2xl font-bold text-red-900">0</p>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-100">
+                    <p class="text-sm text-yellow-600 font-semibold">Nilai Akhir</p>
+                    <p id="finalScore" class="text-2xl font-bold text-yellow-900">0</p>
+                </div>
+            </div>
+            
+            <button onclick="resetGame()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95">
+                Main Lagi
+            </button>
+        </div>
+    </main>
+
+    <!-- Modal Question -->
+    <div id="questionModal" class="modal-overlay">
+        <div class="modal-content p-6 flex flex-col">
+            <!-- Modal Header with Timer -->
+            <div class="flex justify-between items-center border-b border-gray-100 pb-4 mb-4">
+                <h3 id="modalBallNumber" class="text-xl font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">Bola #1</h3>
+                
+                <div class="relative flex items-center justify-center w-12 h-12">
+                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                        <path class="text-gray-200" stroke-width="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path id="timerCircle" class="text-blue-500 timer-circle" stroke-dasharray="100, 100" stroke-width="3" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    </svg>
+                    <span id="timerText" class="absolute text-sm font-bold text-gray-700">45</span>
+                </div>
+            </div>
+
+            <!-- Question Body -->
+            <div id="questionText" class="text-lg font-medium text-gray-800 mb-6">Pertanyaan...</div>
+
+            <!-- Options Area (MC or Oral) -->
+            <div id="optionsContainer" class="flex flex-col gap-3">
+                <!-- Injected via JS -->
+            </div>
+
+            <!-- Feedback & Discussion (Hidden initially) -->
+            <div id="feedbackContainer" class="hidden mt-6 p-4 rounded-xl">
+                <p id="feedbackTitle" class="font-bold text-lg mb-2"></p>
+                <p id="feedbackDiscussion" class="text-gray-700 text-sm leading-relaxed"></p>
+                <button id="closeModalBtn" onclick="closeModalAndResume()" class="mt-4 w-full bg-gray-800 hover:bg-gray-900 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                    Tutup & Lanjutkan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-blue-900 text-blue-200 text-center py-3 text-sm font-medium z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        © bumonamengajar | 2026
+    </footer>
+
+    <script>
+        // --- 1. DATA SOAL (38 SOAL LENGKAP TANPA PLACEHOLDER) ---
+        const quizData = [
+            // --- MULTIPLE CHOICE (1-30) ---
+            {
+                type: 'mc',
+                q: 'Masyarakat multikultural ditandai oleh keberagaman. Faktor geografis yang paling berpengaruh dalam menciptakan keberagaman suku bangsa di Indonesia adalah...',
+                options: [
+                    'A. Kesuburan tanah yang merata di seluruh pulau',
+                    'B. Letak Indonesia di antara dua benua dan dua samudra',
+                    'C. Kondisi iklim tropis yang memiliki curah hujan tinggi',
+                    'D. Bentuk geografis kepulauan yang mengisolasi kelompok manusia',
+                    'E. Kekayaan sumber daya alam yang melimpah di sektor tambang'
+                ],
+                correct: 3, // D
+                discussion: 'Bentuk geografis kepulauan menyebabkan isolasi geografis, di mana setiap kelompok berkembang dan membentuk budaya, bahasa, serta adat istiadatnya masing-masing secara terpisah.'
+            },
+            {
+                type: 'mc',
+                q: 'Gejala sosial berupa primodialisme sering muncul dalam masyarakat multikultural. Dampak negatif utama dari primordialisme yang berlebihan adalah...',
+                options: [
+                    'A. Memperkuat integrasi nasional secara menyeluruh',
+                    'B. Memicu konflik horizontal antarkelompok masyarakat',
+                    'C. Mendorong asimilasi budaya secara alami',
+                    'D. Memperkaya khazanah kebudayaan bangsa',
+                    'E. Menumbuhkan sikap toleransi yang tinggi'
+                ],
+                correct: 1, // B
+                discussion: 'Primordialisme berlebihan membuat seseorang menganggap kelompok asal/sukunya paling baik, sehingga rentan memicu prasangka dan konflik horizontal dengan kelompok lain.'
+            },
+            {
+                type: 'mc',
+                q: 'Diferensiasi sosial berdasarkan ras merupakan pengelompokan masyarakat yang bersifat horizontal. Ciri utama yang digunakan untuk membedakan ras adalah...',
+                options: [
+                    'A. Status sosial ekonomi',
+                    'B. Tingkat pendidikan dan keahlian',
+                    'C. Ciri fisik biologis yang melekat pada individu',
+                    'D. Kepercayaan dan ritual keagamaan',
+                    'E. Adat istiadat dan tradisi turun-temurun'
+                ],
+                correct: 2, // C
+                discussion: 'Ras diklasifikasikan murni berdasarkan ciri fisik/biologis seperti warna kulit, bentuk rambut, dan struktur wajah, bukan berdasarkan kebudayaan atau ekonomi.'
+            },
+            {
+                type: 'mc',
+                q: 'Dalam masyarakat majemuk, sering terjadi persilangan keanggotaan (intersection). Pengaruh positif dari intersection ini adalah...',
+                options: [
+                    'A. Memperkuat sikap etnosentrisme antarkelompok',
+                    'B. Meningkatkan potensi disintegrasi bangsa',
+                    'C. Menciptakan stratifikasi sosial yang kaku',
+                    'D. Mengurangi potensi konflik melalui loyalitas ganda',
+                    'E. Mendorong terbentuknya segregasi wilayah'
+                ],
+                correct: 3, // D
+                discussion: 'Intersection (persilangan keanggotaan) membuat individu dari berbagai latar belakang berbeda bertemu dalam satu wadah yang sama, sehingga loyalitas menjadi ganda dan meredam potensi konflik.'
+            },
+            {
+                type: 'mc',
+                q: 'Sikap etnosentrisme merupakan gejala sosial di mana suatu kelompok menilai kebudayaan lain berdasarkan standar kebudayaannya sendiri. Contoh nyata dari etnosentrisme adalah...',
+                options: [
+                    'A. Menghargai perbedaan cara berpakaian antardaerah',
+                    'B. Mempelajari bahasa daerah lain untuk memperluas pergaulan',
+                    'C. Menganggap tradisi adat sukunya jauh lebih beradab dibanding suku lain',
+                    'D. Mengikuti festival budaya nasional dengan antusias',
+                    'E. Memberikan bantuan sosial tanpa memandang latar belakang'
+                ],
+                correct: 2, // C
+                discussion: 'Etnosentrisme ditandai dengan perasaan superioritas budaya sendiri dan merendahkan budaya kelompok lain.'
+            },
+            {
+                type: 'mc',
+                q: 'Proses sosial di mana dua kebudayaan bertemu dan menghasilkan kebudayaan baru tanpa menghilangkan unsur kebudayaan aslinya disebut...',
+                options: [
+                    'A. Akulturasi',
+                    'B. Asimilasi',
+                    'C. Amalgamasi',
+                    'D. Akomodasi',
+                    'E. Arbitrasi'
+                ],
+                correct: 0, // A
+                discussion: 'Akulturasi adalah percampuran dua budaya di mana unsur-unsur asli dari masing-masing budaya masih dapat dikenali.'
+            },
+            {
+                type: 'mc',
+                q: 'Salah satu pemicu konflik di masyarakat multikultural adalah stereotip. Definisi stereotip yang tepat adalah...',
+                options: [
+                    'A. Tindakan kekerasan fisik terhadap minoritas',
+                    'B. Pemisahan fasilitas umum untuk ras tertentu',
+                    'C. Penilaian kaku dan prasangka terhadap suatu kelompok tanpa dasar objektif',
+                    'D. Penggabungan dua unsur kebudayaan yang berbeda',
+                    'E. Persaingan sehat dalam bidang ekonomi'
+                ],
+                correct: 2, // C
+                discussion: 'Stereotip adalah pelabelan atau prasangka kaku terhadap suatu kelompok tertentu yang biasanya tidak didasarkan pada fakta objektif, sering kali memicu diskriminasi.'
+            },
+            {
+                type: 'mc',
+                q: 'Konflik antaretnis sering dilatarbelakangi oleh kesenjangan ekonomi, bukan sekadar perbedaan budaya. Hal ini menunjukkan bahwa gejala sosial multikultural memiliki dimensi...',
+                options: [
+                    'A. Murni kultural',
+                    'B. Kultural dan struktural',
+                    'C. Murni biologis',
+                    'D. Geografis semata',
+                    'E. Psikologis individual'
+                ],
+                correct: 1, // B
+                discussion: 'Kesenjangan ekonomi adalah dimensi struktural (kelas), sedangkan perbedaan budaya adalah dimensi kultural. Keduanya sering berkelindan menjadi pemicu konflik.'
+            },
+            {
+                type: 'mc',
+                q: 'Multikulturalisme tidak hanya mengakui keberagaman, tetapi juga menuntut adanya...',
+                options: [
+                    'A. Dominasi satu kebudayaan mayoritas',
+                    'B. Kesetaraan hak dalam perbedaan kebudayaan',
+                    'C. Penghapusan seluruh perbedaan suku bangsa',
+                    'D. Isolasi setiap kelompok budaya agar tidak tercampur',
+                    'E. Penyatuan semua bahasa daerah menjadi satu bahasa'
+                ],
+                correct: 1, // B
+                discussion: 'Inti dari multikulturalisme adalah pengakuan dan penghargaan atas perbedaan, yang diiringi dengan kesetaraan hak di ranah publik bagi seluruh kelompok.'
+            },
+            {
+                type: 'mc',
+                q: 'Stratifikasi sosial dalam masyarakat industri umumnya bersifat terbuka, yang memungkinkan individu melakukan mobilitas sosial berdasarkan...',
+                options: [
+                    'A. Garis keturunan (ascribed status)',
+                    'B. Gelar kebangsawanan',
+                    'C. Prestasi dan pendidikan (achieved status)',
+                    'D. Kasta keagamaan',
+                    'E. Ciri fisik rasial'
+                ],
+                correct: 2, // C
+                discussion: 'Masyarakat industri modern menggunakan sistem pelapisan sosial terbuka di mana kedudukan seseorang ditentukan oleh usaha dan prestasi (achieved status).'
+            },
+            {
+                type: 'mc',
+                q: 'Ketika terjadi konflik antaragama di suatu daerah, pemerintah mengundang tokoh-tokoh agama tersebut untuk berdialog mencari jalan keluar. Bentuk akomodasi ini disebut...',
+                options: [
+                    'A. Koersi',
+                    'B. Mediasi',
+                    'C. Konsiliasi',
+                    'D. Segregasi',
+                    'E. Gencatan senjata'
+                ],
+                correct: 2, // C
+                discussion: 'Konsiliasi adalah bentuk akomodasi yang mempertemukan keinginan pihak-pihak yang bertikai untuk mencapai kesepakatan bersama lewat lembaga atau perwakilan.'
+            },
+            {
+                type: 'mc',
+                q: 'Amalgamasi dapat mempercepat integrasi sosial dalam masyarakat majemuk. Amalgamasi terjadi melalui proses...',
+                options: [
+                    'A. Pertukaran pelajar antardaerah',
+                    'B. Perkawinan campuran antarkelompok etnis atau ras',
+                    'C. Perdagangan antarpulau yang intensif',
+                    'D. Pertandingan olahraga nasional',
+                    'E. Penyerapan kosakata asing ke bahasa lokal'
+                ],
+                correct: 1, // B
+                discussion: 'Amalgamasi secara sosiologis merujuk pada percampuran biologis melalui perkawinan campur antarkelompok etnis/ras yang berbeda.'
+            },
+            {
+                type: 'mc',
+                q: 'Bentuk keanekaragaman yang dapat memicu ketimpangan sosial (vertikal) di masyarakat adalah perbedaan...',
+                options: [
+                    'A. Agama dan kepercayaan',
+                    'B. Suku dan ras',
+                    'C. Kekayaan dan jabatan',
+                    'D. Jenis kelamin',
+                    'E. Bahasa daerah'
+                ],
+                correct: 2, // C
+                discussion: 'Kekayaan dan jabatan membentuk struktur hierarkis (atas-bawah) yang disebut stratifikasi sosial vertikal, yang sering menimbulkan ketimpangan.'
+            },
+            {
+                type: 'mc',
+                q: 'Perhatikan gejala sosial berikut: Munculnya perkampungan Pecinan, Kampung Arab, dan Kampung Ambon di kota besar. Gejala spasial ini mengindikasikan adanya...',
+                options: [
+                    'A. Asimilasi total',
+                    'B. Segregasi sosial',
+                    'C. Konsiliasi',
+                    'D. Multikulturalisme aktif',
+                    'E. Akomodasi integratif'
+                ],
+                correct: 1, // B
+                discussion: 'Segregasi sosial adalah pemisahan kelompok masyarakat berdasarkan ras/etnis yang tercermin dalam pemisahan wilayah permukiman.'
+            },
+            {
+                type: 'mc',
+                q: 'Sikap chauvinisme sangat berbahaya bagi bangsa multikultural karena mengajarkan...',
+                options: [
+                    'A. Cinta tanah air yang wajar',
+                    'B. Toleransi antarumat beragama',
+                    'C. Pengakuan terhadap kelompok minoritas',
+                    'D. Cinta tanah air berlebihan hingga merendahkan bangsa lain',
+                    'E. Sikap terbuka terhadap budaya asing'
+                ],
+                correct: 3, // D
+                discussion: 'Chauvinisme adalah bentuk nasionalisme ekstrem yang memandang bangsa sendiri jauh lebih unggul seraya merendahkan bangsa/kelompok lain.'
+            },
+            {
+                type: 'mc',
+                q: 'Konsekuensi dari diferensiasi sosial jika tidak dikelola dengan baik adalah terbentuknya in-group dan out-group feeling yang berujung pada...',
+                options: [
+                    'A. Harmoni sosial',
+                    'B. Keadilan sosial',
+                    'C. Prasangka dan diskriminasi',
+                    'D. Pemerataan ekonomi',
+                    'E. Integrasi budaya'
+                ],
+                correct: 2, // C
+                discussion: 'Perasaan ke-kita-an (in-group) yang terlalu kuat dibarengi pandangan negatif terhadap kelompok luar (out-group) merupakan akar prasangka dan diskriminasi.'
+            },
+            {
+                type: 'mc',
+                q: 'Integrasi nasional akan kokoh apabila masyarakat...',
+                options: [
+                    'A. Mengedepankan kepentingan suku masing-masing',
+                    'B. Memiliki konsensus (kesepakatan) terhadap nilai dasar kebangsaan',
+                    'C. Menyembunyikan identitas kulturalnya',
+                    'D. Terpusat pada kekuasaan otoriter',
+                    'E. Menghindari kontak dengan kelompok lain'
+                ],
+                correct: 1, // B
+                discussion: 'Integrasi sosial/nasional sangat bergantung pada adanya konsensus atau kesepakatan nilai bersama, seperti Pancasila di Indonesia.'
+            },
+            {
+                type: 'mc',
+                q: 'Berikut ini yang BUKAN merupakan karakteristik masyarakat majemuk adalah...',
+                options: [
+                    'A. Mengalami segmentasi ke dalam kelompok sub-kebudayaan berbeda',
+                    'B. Struktur sosial terbagi ke dalam lembaga non-komplementer',
+                    'C. Sering mengalami konflik antarkelompok',
+                    'D. Memiliki tingkat integrasi sosial yang tumbuh secara paksaan (coercion)',
+                    'E. Terdapat keseragaman pandangan dan sistem nilai yang mutlak'
+                ],
+                correct: 4, // E
+                discussion: 'Masyarakat majemuk justru kekurangan konsensus nilai yang mutlak; mereka memiliki keragaman pandangan. Keseragaman mutlak tidak terjadi di masyarakat majemuk.'
+            },
+            {
+                type: 'mc',
+                q: 'Politik identitas sering dimanfaatkan dalam pemilihan umum. Hal ini merugikan masyarakat multikultural karena...',
+                options: [
+                    'A. Menciptakan persaingan sehat melalui adu gagasan',
+                    'B. Mendorong partisipasi pemilih dari kalangan minoritas',
+                    'C. Memanfaatkan sentimen SARA untuk memecah belah pemilih',
+                    'D. Menghilangkan budaya lokal demi budaya nasional',
+                    'E. Meningkatkan kesejahteraan ekonomi kelompok marjinal'
+                ],
+                correct: 2, // C
+                discussion: 'Politik identitas berbahaya karena mengeksploitasi perbedaan agama, suku, atau ras (SARA) hanya demi kekuasaan, yang berpotensi membelah masyarakat secara destruktif.'
+            },
+            {
+                type: 'mc',
+                q: 'Asimilasi merupakan proses percampuran budaya di mana...',
+                options: [
+                    'A. Budaya asli masih mendominasi',
+                    'B. Menghasilkan unsur budaya baru dan identitas budaya asal hilang',
+                    'C. Terjadi penolakan terhadap unsur asing',
+                    'D. Kelompok minoritas mendominasi mayoritas',
+                    'E. Keduanya hidup berdampingan tanpa berinteraksi'
+                ],
+                correct: 1, // B
+                discussion: 'Asimilasi menghilangkan ciri khas budaya awal dan melebur menjadi satu kebudayaan yang sama sekali baru yang diadopsi bersama.'
+            },
+            {
+                type: 'mc',
+                q: 'Gejala dominasi kelompok mayoritas terhadap minoritas dapat dicegah dengan mengimplementasikan prinsip...',
+                options: [
+                    'A. Feodalisme',
+                    'B. Demokrasi dan Hak Asasi Manusia',
+                    'C. Sekularisme absolut',
+                    'D. Etnosentrisme',
+                    'E. Kapitalisme'
+                ],
+                correct: 1, // B
+                discussion: 'Demokrasi menjamin hak bersuara semua pihak, dan HAM melindungi hak-hak kelompok minoritas agar setara di depan hukum.'
+            },
+            {
+                type: 'mc',
+                q: 'Xenofobia adalah ketakutan ekstrem terhadap orang atau budaya asing. Dalam konteks globalisasi, gejala ini merupakan bentuk...',
+                options: [
+                    'A. Penerimaan inovasi baru',
+                    'B. Pertahanan budaya yang konstruktif',
+                    'C. Kegagalan beradaptasi dengan kemajemukan global',
+                    'D. Asimilasi lintas negara',
+                    'E. Kestabilan struktur sosial'
+                ],
+                correct: 2, // C
+                discussion: 'Xenofobia merepresentasikan ketidaksiapan mental dan penolakan irasional terhadap orang asing, menghambat adaptasi di era multikultural global.'
+            },
+            {
+                type: 'mc',
+                q: 'Pendidikan multikultural diajarkan di sekolah dengan tujuan utama...',
+                options: [
+                    'A. Memperkenalkan budaya luar negeri secara masif',
+                    'B. Membangun kesadaran akan kesetaraan dan penghargaan terhadap keberagaman',
+                    'C. Mengelompokkan siswa berdasarkan latar belakang sukunya',
+                    'D. Menyeragamkan cara berpikir seluruh siswa',
+                    'E. Menghapus budaya lokal demi budaya modern'
+                ],
+                correct: 1, // B
+                discussion: 'Pendidikan multikultural bertujuan menanamkan empati, toleransi, dan pemahaman kesetaraan sejak dini agar mampu hidup harmonis di tengah perbedaan.'
+            },
+            {
+                type: 'mc',
+                q: 'Faktor yang menghambat terjadinya asimilasi di masyarakat adalah...',
+                options: [
+                    'A. Sikap terbuka dari golongan yang berkuasa',
+                    'B. Amalgamasi',
+                    'C. Persamaan unsur-unsur kebudayaan',
+                    'D. Isolasi fisik dan sosial kelompok tertentu',
+                    'E. Musuh bersama dari luar'
+                ],
+                correct: 3, // D
+                discussion: 'Isolasi fisik/sosial membuat suatu kelompok tertutup dari interaksi luar, sehingga mustahil terjadi asimilasi (peleburan) budaya.'
+            },
+            {
+                type: 'mc',
+                q: 'Untuk mengatasi konflik antarsuku, tokoh masyarakat menetapkan kesepakatan adat. Upaya pengendalian sosial ini bersifat...',
+                options: [
+                    'A. Preventif',
+                    'B. Koersif',
+                    'C. Persuasif dan mediatif',
+                    'D. Destruktif',
+                    'E. Represif secara fisik'
+                ],
+                correct: 2, // C
+                discussion: 'Pendekatan adat dan tokoh masyarakat menggunakan cara dialogis, musyawarah (mediasi), dan bujukan (persuasif) tanpa kekerasan.'
+            },
+            {
+                type: 'mc',
+                q: 'Konsolidasi adalah proses penguatan keanggotaan dalam suatu kelompok. Sisi negatif dari konsolidasi kelompok dalam masyarakat multikultural adalah...',
+                options: [
+                    'A. Meningkatkan solidaritas nasional',
+                    'B. Membantu integrasi kebudayaan',
+                    'C. Mempertajam perbedaan dan jurang pemisah antarkelompok',
+                    'D. Mengurangi sikap prasangka',
+                    'E. Membuka jalan mobilitas sosial'
+                ],
+                correct: 2, // C
+                discussion: 'Bila kelompok tertentu terlalu mengkonsolidasikan (menguatkan/menutup) dirinya ke dalam, hal itu akan mempertajam batas dan memperlebar jurang dengan kelompok lain (sektarianisme).'
+            },
+            {
+                type: 'mc',
+                q: 'Masyarakat Indonesia sering disebut multikultural. Konsep ini secara sosiologis berbeda dengan masyarakat majemuk (plural), perbedaannya terletak pada...',
+                options: [
+                    'A. Jumlah suku yang lebih dari seratus',
+                    'B. Adanya nilai kesetaraan hak dalam perbedaan di konsep multikultural',
+                    'C. Masyarakat plural tidak pernah mengalami konflik',
+                    'D. Masyarakat multikultural dipisahkan oleh wilayah perairan',
+                    'E. Pluralisme hanya menyangkut perbedaan agama'
+                ],
+                correct: 1, // B
+                discussion: 'Masyarakat majemuk sekadar terdiri dari banyak kelompok. Masyarakat multikultural adalah tahap lanjutan di mana keberagaman tersebut dikelola dengan kesetaraan, saling menghormati, dan keadilan.'
+            },
+            {
+                type: 'mc',
+                q: 'Munculnya berbagai organisasi kedaerahan di perguruan tinggi merupakan wujud dari gejala...',
+                options: [
+                    'A. Primordialisme',
+                    'B. Hedonisme',
+                    'C. Sekularisme',
+                    'D. Globalisasi',
+                    'E. Asimilasi'
+                ],
+                correct: 0, // A
+                discussion: 'Membentuk ikatan berdasar asal daerah adalah ekspresi identitas bawaan sejak lahir (primordial) untuk mencari rasa aman dan kekerabatan.'
+            },
+            {
+                type: 'mc',
+                q: 'Kearifan lokal memegang peran penting dalam masyarakat multikultural karena berfungsi sebagai...',
+                options: [
+                    'A. Alat provokasi konflik kultural',
+                    'B. Filter dan pedoman etis dalam berinteraksi serta merawat lingkungan',
+                    'C. Syarat utama masuknya budaya barat',
+                    'D. Hukum pidana tertinggi di negara moderen',
+                    'E. Penghambat kemajuan teknologi'
+                ],
+                correct: 1, // B
+                discussion: 'Kearifan lokal berisi nilai moral, tata krama, dan petuah bijak yang menjaga harmoni sosial serta menyeimbangkan adaptasi dengan perubahan.'
+            },
+            {
+                type: 'mc',
+                q: 'Salah satu tantangan globalisasi terhadap identitas masyarakat multikultural lokal adalah timbulnya hegemoni budaya global. Sikap adaptif yang tepat adalah...',
+                options: [
+                    'A. Menutup diri dari seluruh budaya luar (isolasi)',
+                    'B. Melakukan glokalisasi dengan memfilter dan mengadaptasi nilai global sesuai kearifan lokal',
+                    'C. Menerima gaya hidup global secara mentah-mentah',
+                    'D. Melarang penggunaan bahasa asing sepenuhnya',
+                    'E. Menyerang kelompok yang menggunakan budaya asing'
+                ],
+                correct: 1, // B
+                discussion: 'Glokalisasi menggabungkan unsur global dan lokal secara bijak, sehingga identitas lokal tidak hilang namun tetap relevan di era modern.'
+            },
+
+            // --- ORAL ANSWER (31-38) ---
+            {
+                type: 'oral',
+                q: 'Jelaskan mengapa masyarakat Indonesia yang multikultural sangat rentan terhadap konflik horizontal, serta sebutkan satu contoh upaya preventifnya!',
+                indicator: 'Siswa menyebutkan faktor keragaman suku/agama/ras, adanya potensi etnosentrisme/primordialisme, kesenjangan ekonomi, serta memberikan satu contoh preventif logis (misal: dialog antaragama, pendidikan toleransi).',
+            },
+            {
+                type: 'oral',
+                q: 'Bagaimana peran intersection (persilangan keanggotaan) dalam mengurangi potensi konflik SARA di masyarakat?',
+                indicator: 'Siswa menjelaskan bahwa individu bergabung dalam organisasi lintas batas (misal komunitas hobi, profesi) yang mempertemukan berbagai suku/agama, sehingga menciptakan loyalitas ganda yang meredam fanatisme sempit.',
+            },
+            {
+                type: 'oral',
+                q: 'Berikan analisis singkat mengenai perbedaan mendasar antara asimilasi dan akulturasi dalam proses percampuran kebudayaan!',
+                indicator: 'Siswa membedakan: Asimilasi memunculkan budaya baru dan menghilangkan ciri budaya asli (A+B=C). Akulturasi mencampur budaya namun ciri khas budaya asli masih dipertahankan (A+B=AB).',
+            },
+            {
+                type: 'oral',
+                q: 'Sikap toleransi sering dianggap sebagai kunci kedamaian. Menurut Anda, apakah toleransi saja cukup untuk membangun masyarakat multikultural yang ideal? Jelaskan!',
+                indicator: 'Siswa berargumen analitis (HOTS). Menjawab bahwa toleransi (membiarkan) tidak cukup, melainkan butuh kesetaraan hak, keadilan ekonomi, dan interaksi yang saling menghargai secara aktif (multikulturalisme nyata).',
+            },
+            {
+                type: 'oral',
+                q: 'Apa dampak negatif dari politik identitas bagi keutuhan integrasi nasional bangsa Indonesia?',
+                indicator: 'Siswa menjelaskan politik identitas mengeksploitasi perbedaan agama/suku demi suara pemilih, yang mengakibatkan polarisasi massa, kebencian antarkelompok, dan rapuhnya persatuan nasional.',
+            },
+            {
+                type: 'oral',
+                q: 'Jelaskan perbedaan antara diferensiasi sosial dan stratifikasi sosial dalam mengkategorikan masyarakat multikultural!',
+                indicator: 'Siswa menyatakan diferensiasi adalah pembedaan setara/horizontal (suku, agama, ras, gender), sedangkan stratifikasi adalah pelapisan bertingkat/vertikal (kekayaan, jabatan, pendidikan).',
+            },
+            {
+                type: 'oral',
+                q: 'Berikan contoh nyata fenomena segregasi sosial di kota besar dan apa faktor penyebabnya!',
+                indicator: 'Siswa memberikan contoh (misal: permukiman elit tertutup, pecinan, kampung kumuh yang terpisah rasial/ekonomi) dan menyebutkan faktor penyebab seperti kesenjangan ekonomi atau perasaan in-group yang tertutup.',
+            },
+            {
+                type: 'oral',
+                q: 'Mengapa etnosentrisme yang berlebihan dapat menghambat laju modernisasi suatu kelompok masyarakat?',
+                indicator: 'Siswa menjelaskan bahwa etnosentrisme ekstrem membuat kelompok tertutup, menolak inovasi atau ide dari luar karena dianggap inferior/merusak, sehingga mereka tertinggal oleh kemajuan zaman.',
+            }
+        ];
+
+        // --- 2. GAME VARIABLES & LOGIC ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let balls = [];
+        let animationId;
+        let isPaused = false;
+        
+        let scoreCorrect = 0;
+        let scoreWrong = 0;
+        let totalScorePoints = 0; // Each correct MC is 100, Oral can be 100/50/0
+        let answeredCount = 0;
+        const totalBalls = 38;
+
+        // Timer variables
+        let timerInterval;
+        let timeLeft = 45;
+        let currentActiveBall = null;
+
+        // Color Palette for Balls
+        const ballColorPalette = [
+            { base: '#0055ff', border: '#003399', text: '#ffffff' }, // Biru Elektrik
+            { base: '#ff1a1a', border: '#990000', text: '#ffffff' }, // Merah
+            { base: '#00e600', border: '#008000', text: '#000000' }, // Hijau Cerah
+            { base: '#ffe600', border: '#b3a100', text: '#000000' }, // Kuning Cerah
+            { base: '#cc00ff', border: '#660080', text: '#ffffff' }, // Ungu Cerah
+            { base: '#ff33cc', border: '#99007a', text: '#ffffff' }  // Pink Cerah
+        ];
+
+        // Ball Class
+        class Ball {
+            constructor(num, x, y, radius, dx, dy) {
+                this.num = num;
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.dx = dx;
+                this.dy = dy;
+                this.answered = false;
+                
+                // Assign color cyclically based on ball number
+                const palette = ballColorPalette[num % ballColorPalette.length];
+                this.baseColor = palette.base;
+                this.borderColor = palette.border;
+                this.textColor = palette.text;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                
+                if (this.answered) {
+                    ctx.fillStyle = '#cbd5e1'; // Slate 300 (dimmed)
+                    ctx.strokeStyle = '#94a3b8';
+                } else {
+                    ctx.fillStyle = this.baseColor;
+                    ctx.strokeStyle = this.borderColor; // Dynamic border color
+                }
+                
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.closePath();
+
+                // Draw Text
+                ctx.fillStyle = this.answered ? '#64748b' : this.textColor;
+                ctx.font = 'bold 16px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.num, this.x, this.y);
+            }
+
+            update() {
+                if (this.answered || isPaused) return;
+
+                // Wall collision
+                if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
+                    this.dx = -this.dx;
+                }
+                if (this.y + this.radius > canvas.height || this.y - this.radius < 0) {
+                    this.dy = -this.dy;
+                }
+
+                this.x += this.dx;
+                this.y += this.dy;
+            }
+        }
+
+        // Initialize Game
+        function initCanvas() {
+            canvas.width = document.getElementById('gameContainer').clientWidth;
+            canvas.height = document.getElementById('gameContainer').clientHeight;
+
+            balls = [];
+            for (let i = 0; i < totalBalls; i++) {
+                let radius = 22;
+                // Keep inside bounds safely
+                let x = Math.random() * (canvas.width - radius * 2) + radius;
+                let y = Math.random() * (canvas.height - radius * 2) + radius;
+                let dx = (Math.random() - 0.5) * 4; // speed
+                let dy = (Math.random() - 0.5) * 4;
+
+                // Ensure it's not strictly 0
+                if (dx === 0) dx = 1;
+                if (dy === 0) dy = 1;
+
+                balls.push(new Ball(i + 1, x, y, radius, dx, dy));
+            }
+        }
+
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            if (!isPaused) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                balls.forEach(ball => {
+                    ball.update();
+                    ball.draw();
+                });
+            }
+        }
+
+        // Handle Click on Canvas
+        canvas.addEventListener('click', (e) => {
+            if (isPaused) return;
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            // Check collision with balls (reverse loop to click top-most if overlap)
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const b = balls[i];
+                if (b.answered) continue;
+
+                const dist = Math.hypot(clickX - b.x, clickY - b.y);
+                if (dist <= b.radius) {
+                    openModal(b);
+                    break;
+                }
+            }
+        });
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            if (!isPaused) {
+                canvas.width = document.getElementById('gameContainer').clientWidth;
+                canvas.height = document.getElementById('gameContainer').clientHeight;
+                // Move balls inside if they got pushed out
+                balls.forEach(b => {
+                    if (b.x > canvas.width) b.x = canvas.width - b.radius;
+                    if (b.y > canvas.height) b.y = canvas.height - b.radius;
+                });
+            }
+        });
+
+        // --- MODAL & QUIZ LOGIC ---
+        function openModal(ball) {
+            isPaused = true;
+            currentActiveBall = ball;
+            const qIndex = ball.num - 1;
+            const qData = quizData[qIndex];
+
+            // Reset UI
+            document.getElementById('feedbackContainer').classList.add('hidden');
+            document.getElementById('optionsContainer').innerHTML = '';
+            document.getElementById('modalBallNumber').innerText = `Soal #${ball.num}`;
+            document.getElementById('questionText').innerText = qData.q;
+            
+            // Build Options based on type
+            if (qData.type === 'mc') {
+                qData.options.forEach((opt, idx) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-option w-full text-left bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 font-medium py-3 px-4 rounded-xl';
+                    btn.innerText = opt;
+                    btn.onclick = () => handleMCAnswer(idx, qData.correct, qData.discussion);
+                    document.getElementById('optionsContainer').appendChild(btn);
+                });
+            } else {
+                // Oral Question
+                const indDiv = document.createElement('div');
+                indDiv.className = 'bg-yellow-50 border border-yellow-200 p-4 rounded-xl text-sm text-yellow-800 mb-4 font-medium';
+                indDiv.innerHTML = `<strong>Indikator Jawaban:</strong><br/>${qData.indicator}`;
+                document.getElementById('optionsContainer').appendChild(indDiv);
+
+                const label = document.createElement('p');
+                label.className = 'font-bold text-gray-700 mb-2';
+                label.innerText = 'Rubrik Penilaian Guru:';
+                document.getElementById('optionsContainer').appendChild(label);
+
+                const btnGroup = document.createElement('div');
+                btnGroup.className = 'flex flex-col gap-2';
+
+                const btn100 = createBtn('Benar / Sangat Tepat (100 Poin)', 'bg-green-600 hover:bg-green-700', () => handleOralAnswer(100));
+                const btn50 = createBtn('Sebagian Benar (50 Poin)', 'bg-yellow-500 hover:bg-yellow-600', () => handleOralAnswer(50));
+                const btn0 = createBtn('Salah / Belum Tepat (0 Poin)', 'bg-red-600 hover:bg-red-700', () => handleOralAnswer(0));
+
+                btnGroup.appendChild(btn100);
+                btnGroup.appendChild(btn50);
+                btnGroup.appendChild(btn0);
+                document.getElementById('optionsContainer').appendChild(btnGroup);
+            }
+
+            document.getElementById('questionModal').classList.add('active');
+            startTimer();
+        }
+
+        function createBtn(text, colorClasses, onClickFunc) {
+            const btn = document.createElement('button');
+            btn.className = `btn-option w-full text-white font-bold py-3 px-4 rounded-xl shadow-sm ${colorClasses}`;
+            btn.innerText = text;
+            btn.onclick = onClickFunc;
+            return btn;
+        }
+
+        // Timer Logic
+        function startTimer() {
+            timeLeft = 45;
+            updateTimerUI();
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerUI();
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeOut();
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            document.getElementById('timerText').innerText = timeLeft;
+            const circle = document.getElementById('timerCircle');
+            const percent = (timeLeft / 45) * 100;
+            circle.style.strokeDashoffset = 100 - percent;
+            
+            if (timeLeft <= 10) {
+                circle.classList.replace('text-blue-500', 'text-red-500');
+                document.getElementById('timerText').classList.add('text-red-600');
+            } else {
+                circle.classList.replace('text-red-500', 'text-blue-500');
+                document.getElementById('timerText').classList.remove('text-red-600');
+            }
+        }
+
+        function handleTimeOut() {
+            disableAllOptions();
+            const qData = quizData[currentActiveBall.num - 1];
+            
+            // Mark as wrong
+            scoreWrong++;
+            updateProgress();
+
+            showFeedback("WAKTU HABIS!", "red", qData.type === 'mc' ? qData.discussion : "Waktu menjawab telah selesai. Periksa kembali rubrik dan materi.");
+        }
+
+        // Answer Handlers
+        function handleMCAnswer(selectedIdx, correctIdx, discussion) {
+            clearInterval(timerInterval);
+            disableAllOptions();
+
+            const btns = document.getElementById('optionsContainer').querySelectorAll('button');
+            
+            if (selectedIdx === correctIdx) {
+                btns[selectedIdx].classList.replace('bg-blue-50', 'bg-green-500');
+                btns[selectedIdx].classList.replace('text-blue-900', 'text-white');
+                scoreCorrect++;
+                totalScorePoints += 100;
+                showFeedback("BENAR!", "green", discussion);
+            } else {
+                btns[selectedIdx].classList.replace('bg-blue-50', 'bg-red-500');
+                btns[selectedIdx].classList.replace('text-blue-900', 'text-white');
+                btns[correctIdx].classList.replace('bg-blue-50', 'bg-green-500');
+                btns[correctIdx].classList.replace('text-blue-900', 'text-white');
+                scoreWrong++;
+                showFeedback("SALAH!", "red", discussion);
+            }
+            updateProgress();
+        }
+
+        function handleOralAnswer(points) {
+            clearInterval(timerInterval);
+            disableAllOptions();
+
+            totalScorePoints += points;
+            if (points === 100) {
+                scoreCorrect++;
+                showFeedback("TERCATAT: BENAR", "green", "Poin 100 telah ditambahkan.");
+            } else if (points === 50) {
+                // Counts as answered, but partial score. Let's count as half correct/wrong for stats or just update points.
+                // We will just update points and mark answered.
+                showFeedback("TERCATAT: SEBAGIAN BENAR", "yellow", "Poin 50 telah ditambahkan.");
+            } else {
+                scoreWrong++;
+                showFeedback("TERCATAT: SALAH", "red", "Poin 0 ditambahkan.");
+            }
+            updateProgress();
+        }
+
+        function disableAllOptions() {
+            const btns = document.getElementById('optionsContainer').querySelectorAll('button');
+            btns.forEach(b => {
+                b.disabled = true;
+                b.style.opacity = '0.7';
+                b.style.cursor = 'not-allowed';
+            });
+        }
+
+        function showFeedback(titleText, colorTheme, discussionText) {
+            const fc = document.getElementById('feedbackContainer');
+            const ft = document.getElementById('feedbackTitle');
+            const fd = document.getElementById('feedbackDiscussion');
+
+            fc.className = `mt-6 p-4 rounded-xl border block`; // reset
+            if (colorTheme === 'green') {
+                fc.classList.add('bg-green-50', 'border-green-200');
+                ft.className = 'font-extrabold text-xl text-green-600 mb-2';
+            } else if (colorTheme === 'red') {
+                fc.classList.add('bg-red-50', 'border-red-200');
+                ft.className = 'font-extrabold text-xl text-red-600 mb-2';
+            } else {
+                fc.classList.add('bg-yellow-50', 'border-yellow-200');
+                ft.className = 'font-extrabold text-xl text-yellow-600 mb-2';
+            }
+
+            ft.innerText = titleText;
+            fd.innerHTML = `<strong>Pembahasan:</strong><br/>${discussionText}`;
+        }
+
+        function closeModalAndResume() {
+            document.getElementById('questionModal').classList.remove('active');
+            
+            // Mark ball as done
+            if (currentActiveBall) {
+                currentActiveBall.answered = true;
+                answeredCount++;
+                currentActiveBall = null;
+            }
+
+            updateProgress();
+
+            if (answeredCount >= totalBalls) {
+                endGame();
+            } else {
+                isPaused = false;
+                // Redraw immediately to remove active ball visually
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                balls.forEach(ball => ball.draw());
+            }
+        }
+
+        function updateProgress() {
+            document.getElementById('progressText').innerText = `Terjawab: ${answeredCount} / Total: ${totalBalls}`;
+            document.getElementById('scoreText').innerText = `Skor Benar: ${scoreCorrect}`;
+        }
+
+        function endGame() {
+            document.getElementById('gameContainer').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'flex';
+            
+            document.getElementById('finalCorrect').innerText = scoreCorrect;
+            document.getElementById('finalWrong').innerText = totalBalls - scoreCorrect; // Simplification (Oral 50pts might skew logic, but conceptually fine)
+            
+            // Calculate final score scaled to 100
+            let maxPoints = totalBalls * 100;
+            let finalValue = Math.round((totalScorePoints / maxPoints) * 100);
+            document.getElementById('finalScore').innerText = finalValue;
+        }
+
+        function resetGame() {
+            scoreCorrect = 0;
+            scoreWrong = 0;
+            totalScorePoints = 0;
+            answeredCount = 0;
+            isPaused = false;
+            
+            updateProgress();
+            
+            document.getElementById('gameContainer').style.display = 'flex';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            initCanvas();
+        }
+
+        // Start Application
+        window.onload = () => {
+            initCanvas();
+            animate();
+        };
+
+    </script>
+</body>
+</html>
